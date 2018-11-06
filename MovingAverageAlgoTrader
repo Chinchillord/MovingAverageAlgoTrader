@@ -1,0 +1,106 @@
+import requests.api
+import time
+#Robinhood Python library by Jamonek: https://github.com/Jamonek/Robinhood
+from Robinhood import Robinhood
+
+class AlphaVantage:
+
+	def __init__(self, url, tradeparameters):
+		print("Acessing AlphaVantage API")
+		self.tradeparameters = tradeparameters
+		self.url = url
+
+	def getmovingaveragedata(self):
+		page = requests.get(self.url, params = self.tradeparameters)
+		return page.json()
+
+	def getcurrentdata (self):
+		MAtype = self.tradeparameters["function"]
+		allvalues = self.getmovingaveragedata()
+		filteredvalues = allvalues["Technical Analysis: " + MAtype]
+		dates = list(filteredvalues)
+		Final_EMA = filteredvalues[str(dates[0])][MAtype]
+		return Final_EMA
+
+class TradeLogic:
+
+	def __init__(self, tradesymbol, timetorun, isfasthigh = False, aminlong = False, aminshort = False, fastMAvalue = 0, slowMAvalue = 0):
+		self.isfasthigh = isfasthigh
+		self.aminlong = aminlong
+		self.aminshort = aminshort
+		self.fastMAvalue = fastMAvalue
+		self.slowMAvalue = slowMAvalue
+		self.endtime = time.time() + timetorun
+		self.tradesymbol = tradesymbol
+		self.FastAlpha = AlphaVantage(myURL, fastdata)
+		self.SlowAlpha = AlphaVantage(myURL, slowdata)
+
+
+	def analyze(self):
+		self.fastMAvalue = self.FastAlpha.getcurrentdata()
+		self.slowMAvalue = self.SlowAlpha.getcurrentdata()
+
+		if(self.fastMAvalue > self.slowMAvalue):
+			self.isfasthigh = True
+
+		while(time.time() <= self.endtime):
+			print("Fast MA = %r" % self.fastMAvalue)
+			print("Slow MA = %r" % self.slowMAvalue)
+
+			if (self.isfasthigh == False and self.fastMAvalue > self.slowMAvalue and self.aminlong == False):
+				print("Go long here")
+				#Robin.place_buy_order(tradeSymbol, 1)
+				self.aminlong = True
+				self.isfasthigh = True
+
+			if (self.isfasthigh == True and self.fastMAvalue < self.slowMAvalue and self.aminlong == True):
+				print("Close long here")
+				#Robin.place_sell_order(tradeSymbol, 1)
+				self.aminlong = False
+				self.isfasthigh = False
+
+			#Invalid case for Robinhood platform. Short sales not allowed on Robinhood account.
+			if (self.isfasthigh == True and self.fastMAvalue < self.slowMAvalue and self.aminshort == False):
+				print("Go short here")
+				#Robin.place_sell_order(tradeSymbol, 1)
+				self.aminshort = True
+				self.isfasthigh = False
+
+			# Invalid case for Robinhood platform. Short sales not allowed on Robinhood account.
+			if (self.isfasthigh == False and self.fastMAvalue > self.slowMAvalue and self.aminshort == True):
+				print("Close short here")
+				#Robin.place_buy_order(tradeSymbol, 1)
+				self.aminshort = False
+				self.isfasthigh = True
+
+			#AlphaVantage requests that api calls not be made more often than every one second.
+			time.sleep(5)
+
+		self.fastMAvalue = self.FastAlpha.getcurrentdata()
+		self.slowMAvalue = self.SlowAlpha.getcurrentdata()
+
+rhoodusername = "InvalidUsername"
+rhoodpassword = "InvalidPassword"
+tradesymbol = "CMG"
+avantagekey = "InvalidKey"
+timetorun = 300
+myURL = "https://www.alphavantage.co/query?"
+
+fastdata = {"function": "EMA",
+		 			"symbol": tradesymbol,
+					"interval": "1min",
+					"time_period": 10,
+		 			"series_type": "close",
+		 			"apikey": avantagekey}
+
+slowdata = {"function": "SMA",
+		 			"symbol": tradesymbol,
+					"interval": "1min",
+					"time_period": 30,
+		 			"series_type": "close",
+		 			"apikey": avantagekey}
+
+Robin = Robinhood()
+Trader = TradeLogic("CMG", timetorun)
+#myTrader.login(username = rhoodusername, password = rhoodpassword)
+Trader.analyze()
